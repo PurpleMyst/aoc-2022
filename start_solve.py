@@ -64,6 +64,7 @@ def main() -> None:
     resp = requests.get(
         f"https://adventofcode.com/{year}/day/{day}/input",
         cookies=cookies,
+        headers={"User-Agent": "PurpleMyst/aoc-template getting the input! <3"}
     )
     resp.raise_for_status()
     puzzle_input = resp.text

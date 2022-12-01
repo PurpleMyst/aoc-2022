@@ -61,6 +61,13 @@ def main() -> None:
         print(f"{crate} already exists.")
         return
 
+    resp = requests.get(
+        f"https://adventofcode.com/{year}/day/{day}/input",
+        cookies=cookies,
+    )
+    resp.raise_for_status()
+    puzzle_input = resp.text
+
     with open("Cargo.toml") as manifest_f:
         manifest = toml.load(manifest_f)
 
@@ -84,20 +91,9 @@ def main() -> None:
     )
 
     src = crate_path / "src"
-
-    with (src / "main.rs").open("w") as main:
-        main.write(MAIN.format(crate=crate))
-
-    with (src / "lib.rs").open("w") as lib:
-        lib.write(LIB.format(crate=crate))
-
-    with (src / "input.txt").open("w", newline="\n") as input_f:
-        resp = requests.get(
-            f"https://adventofcode.com/{year}/day/{day}/input",
-            cookies=cookies,
-        )
-        resp.raise_for_status()
-        input_f.write(resp.text)
+    (src / "main.rs").write_text(MAIN.format(crate=crate))
+    (src / "lib.rs").write_text(LIB.format(crate=crate))
+    (src / "input.txt").write_text(puzzle_input, newline="\n")
 
     subprocess.run(["git", "add", crate], check=True)
     webbrowser.open_new(f"https://adventofcode.com/{year}/day/{day}")

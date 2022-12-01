@@ -4,8 +4,7 @@ const TOP_N: usize = 3;
 
 #[inline]
 pub fn solve() -> (impl Display, impl Display) {
-    let mut p1 = 0;
-    let mut p2 = [0; TOP_N];
+    let mut biggest = [0; TOP_N];
 
     include_str!("input.txt")
         .split("\n\n")
@@ -16,12 +15,11 @@ pub fn solve() -> (impl Display, impl Display) {
                 .sum()
         })
         .for_each(|elf| {
-            p1 = p1.max(elf);
-            if let Some(i) = p2.iter().position(|&n| elf >= n) {
-                p2[i..].rotate_right(1);
-                p2[i] = elf;
+            if let Some(i) = biggest.iter().position(|&n| elf >= n) {
+                biggest[i..].rotate_right(1);
+                biggest[i] = elf;
             }
         });
 
-    (p1, p2.into_iter().sum::<u64>())
+    (biggest[0], biggest.into_iter().sum::<u64>())
 }

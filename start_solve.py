@@ -64,7 +64,7 @@ def main() -> None:
     resp = requests.get(
         f"https://adventofcode.com/{year}/day/{day}/input",
         cookies=cookies,
-        headers={"User-Agent": "PurpleMyst/aoc-template getting the input! <3"}
+        headers={"User-Agent": "PurpleMyst/aoc-template getting the input! <3"},
     )
     resp.raise_for_status()
     puzzle_input = resp.text
@@ -92,8 +92,8 @@ def main() -> None:
     )
 
     src = crate_path / "src"
-    (src / "main.rs").write_text(MAIN.format(crate=crate))
-    (src / "lib.rs").write_text(LIB.format(crate=crate))
+    (src / "main.rs").write_text(MAIN.format(crate=crate), newline="\n")
+    (src / "lib.rs").write_text(LIB.format(crate=crate), newline="\n")
     (src / "input.txt").write_text(puzzle_input, newline="\n")
 
     subprocess.run(["git", "add", crate], check=True)

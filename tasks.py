@@ -5,7 +5,9 @@ from functools import partial, wraps
 from os import chdir, environ
 from pathlib import Path
 
-import browser_cookie3 as bc
+import browser_cookie3
+import bs4
+import html2text
 import requests
 import toml
 from argh import aliases, arg, dispatch_commands, named, wrap_errors
@@ -32,6 +34,10 @@ DEFAULT_BASELINE = "previous"
 NOW = datetime.datetime.now()
 DEFAULT_DAY = NOW.day
 DEFAULT_YEAR = NOW.year
+
+session = requests.Session()
+session.cookies.update(browser_cookie3.load(domain_name="adventofcode.com"))
+session.headers.update({"User-Agent": "PurpleMyst/aoc-template with much love! <3"})
 
 run = partial(subprocess.run, check=True)
 
@@ -67,8 +73,6 @@ def rechdir(f):
 @wrap_errors((requests.HTTPError,))
 def start_solve(day: int = DEFAULT_DAY, year: int = DEFAULT_YEAR) -> None:
     "Start solving a day, by default today."
-    cookies = bc.load(domain_name="adventofcode.com")
-
     crate = f"day{day:02}"
     crate_path = Path(crate)
 
@@ -76,11 +80,7 @@ def start_solve(day: int = DEFAULT_DAY, year: int = DEFAULT_YEAR) -> None:
         print(f"{crate} already exists.")
         return
 
-    resp = requests.get(
-        f"https://adventofcode.com/{year}/day/{day}/input",
-        cookies=cookies,
-        headers={"User-Agent": "PurpleMyst/aoc-template getting the input! <3"},
-    )
+    resp = session.get(f"https://adventofcode.com/{year}/day/{day}/input")
     resp.raise_for_status()
     puzzle_input = resp.text
 
@@ -193,11 +193,45 @@ def run_prototype() -> None:
     run(("cargo", "watch", "--clear", "--shell", "python3 prototype.py"))
 
 
+@arg(
+    "-d",
+    "--day",
+    choices=range(1, 25 + 1),
+    required=False,
+)
+@arg(
+    "-y",
+    "--year",
+    choices=range(2015, DEFAULT_YEAR + 1),
+    required=False,
+)
+@arg("level", help="Which part to submit.", choices=(1, 2))
+@aliases("a")
+@wrap_errors((requests.HTTPError, AssertionError))
+def answer(
+    answer: str, level: int, day: int = DEFAULT_DAY, year: int = DEFAULT_YEAR
+) -> None:
+    "Submit your answer!"
+    resp = session.post(
+        f"https://adventofcode.com/{year}/day/{day}/answer",
+        data={"answer": answer, "level": str(level)},
+    )
+    resp.raise_for_status()
+
+    # Get the main text, removing the "return to" link, and show it in markdown form.
+    soup = bs4.BeautifulSoup(resp.text, features="html.parser").main
+    soup.find(href=f"/{year}/day/{day}").decompose()  # type: ignore
+    h = html2text.HTML2Text()
+    h.ignore_links = True
+    print(h.handle(str(soup)).strip())
+
+
 def main() -> None:
     environ["RUST_BACKTRACE"] = "1"
     dispatch_commands(
         (
             start_solve,
+            answer,
             set_baseline,
             compare,
             criterion,

@@ -1,8 +1,9 @@
 import argparse
 import datetime
-import pathlib
 import subprocess
 import webbrowser
+from functools import partial
+from pathlib import Path
 
 import browser_cookie3 as bc
 import requests
@@ -25,8 +26,16 @@ pub fn solve() -> (impl Display, impl Display) {{
 }}\
 """
 
+run = partial(subprocess.run, check=True)
 
-def main() -> None:
+
+def add_line(p: Path, l: str) -> None:
+    ls = p.read_text().splitlines()
+    ls.insert(-1, l)
+    p.write_text("\n".join(ls), newline="\n")
+
+
+def argument_parser() -> argparse.ArgumentParser:
     now = datetime.datetime.now()
     default_day = now.day
     default_year = now.year
@@ -48,14 +57,18 @@ def main() -> None:
         default=default_year,
         required=False,
     )
-    argv = argp.parse_args()
+    return argp
+
+
+def main() -> None:
+    argv = argument_parser().parse_args()
     day: int = argv.day
     year: int = argv.year
 
     cookies = bc.load(domain_name="adventofcode.com")
 
     crate = f"day{day:02}"
-    crate_path = pathlib.Path(crate)
+    crate_path = Path(crate)
 
     if crate_path.exists():
         print(f"{crate} already exists.")
@@ -77,9 +90,9 @@ def main() -> None:
     with open("Cargo.toml", "w") as manifest_f:
         toml.dump(manifest, manifest_f)
 
-    subprocess.run(["cargo", "new", "--bin", crate], check=True)
-    subprocess.run(
-        [
+    run(("cargo", "new", "--bin", crate))
+    run(
+        (
             "cargo",
             "add",
             "--manifest-path",
@@ -87,8 +100,7 @@ def main() -> None:
             "--path",
             crate,
             crate,
-        ],
-        check=True,
+        )
     )
 
     src = crate_path / "src"
@@ -96,7 +108,11 @@ def main() -> None:
     (src / "lib.rs").write_text(LIB.format(crate=crate), newline="\n")
     (src / "input.txt").write_text(puzzle_input, newline="\n")
 
-    subprocess.run(["git", "add", crate], check=True)
+    benches = Path("benchmark", "benches")
+    add_line(benches / "criterion.rs", f"{crate},")
+    add_line(benches / "iai.rs", f"{crate}: {crate}_solve,")
+
+    run(("git", "add", crate))
     webbrowser.open_new(f"https://adventofcode.com/{year}/day/{day}")
 
 

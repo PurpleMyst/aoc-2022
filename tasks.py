@@ -48,7 +48,7 @@ def add_line(p: Path, l: str) -> None:
     p.write_text("\n".join(ls), newline="\n")
 
 
-def rechdir(f):
+def in_root_dir(f):
     @wraps(f)
     def inner(*args, **kwargs):
         chdir(Path(__file__).parent)
@@ -57,18 +57,21 @@ def rechdir(f):
     return inner
 
 
-@arg(
-    "-d",
-    "--day",
-    choices=range(1, 25 + 1),
-    required=False,
-)
-@arg(
-    "-y",
-    "--year",
-    choices=range(2015, DEFAULT_YEAR + 1),
-    required=False,
-)
+def year_and_day(f):
+    day = arg(
+        "-d", "--day", choices=range(1, 25 + 1), default=DEFAULT_DAY, required=False
+    )
+    year = arg(
+        "-y",
+        "--year",
+        choices=range(2015, DEFAULT_YEAR + 1),
+        default=DEFAULT_YEAR,
+        required=False,
+    )
+    return day(year(f))
+
+
+@year_and_day
 @aliases("ss")
 @wrap_errors((requests.HTTPError,))
 def start_solve(day: int = DEFAULT_DAY, year: int = DEFAULT_YEAR) -> None:
@@ -113,12 +116,14 @@ def start_solve(day: int = DEFAULT_DAY, year: int = DEFAULT_YEAR) -> None:
     add_line(benches / "criterion.rs", f"    {crate},")
     add_line(benches / "iai.rs", f"    {crate}: {crate}_solve,")
 
+    fetch_problem(year, day)
+
     run(("git", "add", crate))
     webbrowser.open_new(f"https://adventofcode.com/{year}/day/{day}")
 
 
 @aliases("sb")
-@rechdir
+@in_root_dir
 def set_baseline(day: str, name: str = DEFAULT_BASELINE) -> None:
     "Run a criterion benchmark, setting its results as the new baseline."
     run(
@@ -137,7 +142,7 @@ def set_baseline(day: str, name: str = DEFAULT_BASELINE) -> None:
 
 
 @aliases("cmp")
-@rechdir
+@in_root_dir
 def compare(day: str, name: str = DEFAULT_BASELINE) -> None:
     "Run a criterion benchmark, comparing its results to the saved baseline."
     run(
@@ -155,13 +160,13 @@ def compare(day: str, name: str = DEFAULT_BASELINE) -> None:
     )
 
 
-@rechdir
+@in_root_dir
 def criterion(day: str) -> None:
     "Run a criterion benchmark, without caring about baselines."
     run(("cargo", "bench", "--bench", "criterion", "--", day, "--verbose"))
 
 
-@rechdir
+@in_root_dir
 def iai() -> None:
     "Run the iai benchmark."
     run(("cargo", "bench", "--bench", "iai"))
@@ -192,18 +197,7 @@ def run_prototype() -> None:
     run(("cargo", "watch", "--clear", "--shell", "python3 prototype.py"))
 
 
-@arg(
-    "-d",
-    "--day",
-    choices=range(1, 25 + 1),
-    required=False,
-)
-@arg(
-    "-y",
-    "--year",
-    choices=range(2015, DEFAULT_YEAR + 1),
-    required=False,
-)
+@year_and_day
 @arg("level", help="Which part to submit.", choices=(1, 2))
 @aliases("a")
 @wrap_errors((requests.HTTPError, AssertionError))
@@ -225,6 +219,18 @@ def answer(
     print(h.handle(str(soup)).strip())
 
 
+@aliases("fp")
+@in_root_dir
+@year_and_day
+def fetch_problem(year: int = DEFAULT_YEAR, day: int = DEFAULT_DAY) -> None:
+    resp = session.get(f"https://adventofcode.com/{year}/day/{day}")
+    resp.raise_for_status()
+    soup = bs4.BeautifulSoup(resp.text, features="html.parser").main
+    h = html2text.HTML2Text()
+    t = h.handle(str(soup)).strip()
+    Path(f"day{day:02}", "problem.md").write_text(t)
+
+
 def main() -> None:
     environ["RUST_BACKTRACE"] = "1"
     dispatch_commands(
@@ -239,6 +245,7 @@ def main() -> None:
             do_run,
             run_release,
             run_prototype,
+            fetch_problem,
         ),
     )
 

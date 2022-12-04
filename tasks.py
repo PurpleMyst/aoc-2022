@@ -86,9 +86,8 @@ def start_solve(day: int = DEFAULT_DAY, year: int = DEFAULT_YEAR) -> None:
 
     with open("Cargo.toml") as manifest_f:
         manifest = toml.load(manifest_f)
-
-    manifest["workspace"]["members"].append(crate)
-
+    if crate not in manifest["workspace"]["members"]:
+        manifest["workspace"]["members"].append(crate)
     with open("Cargo.toml", "w") as manifest_f:
         toml.dump(manifest, manifest_f)
 

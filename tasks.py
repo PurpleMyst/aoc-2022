@@ -6,7 +6,8 @@ from os import chdir, environ
 from pathlib import Path
 
 import browser_cookie3
-import bs4
+from bs4 import BeautifulSoup
+from bs4.element import Tag
 import html2text
 import requests
 import toml
@@ -212,8 +213,11 @@ def answer(
     resp.raise_for_status()
 
     # Get the main text, removing the "return to" link, and show it in markdown form.
-    soup = bs4.BeautifulSoup(resp.text, features="html.parser").main
-    soup.find(href=f"/{year}/day/{day}").decompose()  # type: ignore
+    soup = BeautifulSoup(resp.text, features="html.parser").main
+    assert soup is not None, "no main element?"
+    return_link = soup.find(href=f"/{year}/day/{day}")
+    if isinstance(return_link, Tag):
+        return_link.decompose()
     h = html2text.HTML2Text()
     h.ignore_links = True
     print(h.handle(str(soup)).strip())
@@ -251,4 +255,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Bye!")

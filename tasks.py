@@ -229,7 +229,7 @@ def answer(
 def fetch_problem(year: int = DEFAULT_YEAR, day: int = DEFAULT_DAY) -> None:
     resp = session.get(f"https://adventofcode.com/{year}/day/{day}")
     resp.raise_for_status()
-    soup = bs4.BeautifulSoup(resp.text, features="html.parser").main
+    soup = BeautifulSoup(resp.text, features="html.parser").main
     h = html2text.HTML2Text()
     t = h.handle(str(soup)).strip()
     Path(f"day{day:02}", "problem.md").write_text(t)

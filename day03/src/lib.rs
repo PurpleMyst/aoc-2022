@@ -7,9 +7,9 @@ fn parse_compartment(s: &str) -> u64 {
     s.bytes().for_each(|b| {
         debug_assert!(matches!(b, b'a'..=b'z' | b'A'..=b'Z'));
         result |= if b.is_ascii_lowercase() {
-        1 << (b - b'a')
+            1 << (b - b'a')
         } else {
-        1 << (b - b'A' + 26)
+            1 << (b - b'A' + 26)
         };
     });
     result

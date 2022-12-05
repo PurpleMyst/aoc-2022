@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-fn do_solve(mut stacks: Vec<Vec<char>>, instructions: &str, reverse: bool) -> String {
+fn do_solve(mut stacks: Vec<Vec<u8>>, instructions: &str, reverse: bool) -> String {
     let mut buf = Vec::new();
     for instruction in instructions.lines() {
         let mut parts = instruction
@@ -19,10 +19,13 @@ fn do_solve(mut stacks: Vec<Vec<char>>, instructions: &str, reverse: bool) -> St
         };
         stacks[to - 1].append(&mut buf);
     }
-    stacks
-        .into_iter()
-        .map(|mut stack| stack.pop().unwrap())
-        .collect::<String>()
+    String::from_utf8(
+        stacks
+            .into_iter()
+            .map(|mut stack| stack.pop().unwrap())
+            .collect::<Vec<u8>>(),
+    )
+    .unwrap()
 }
 
 #[inline]
@@ -30,19 +33,19 @@ pub fn solve() -> (impl Display, impl Display) {
     let (initial_state, instructions) = include_str!("input.txt").split_once("\n\n").unwrap();
     let mut stacks = vec![vec![]; (initial_state.find('\n').unwrap() + 3) / 4];
 
-    initial_state.lines().for_each(|row| {
-        if row.chars().nth(1).map_or(true, |ch| ch.is_numeric()) {
-            return;
-        }
-        stacks
-            .iter_mut()
-            .zip(row.chars().skip(1).step_by(4))
-            .for_each(|(stack, elem)| {
-                if elem != ' ' {
-                    stack.push(elem)
-                }
-            });
-    });
+    initial_state
+        .lines()
+        .take_while(|row| row.bytes().nth(1).map_or(false, |ch| !ch.is_ascii_digit()))
+        .for_each(|row| {
+            stacks
+                .iter_mut()
+                .zip(row.bytes().skip(1).step_by(4))
+                .for_each(|(stack, elem)| {
+                    if elem != b' ' {
+                        stack.push(elem)
+                    }
+                });
+        });
     stacks.iter_mut().for_each(|stack| stack.reverse());
 
     (

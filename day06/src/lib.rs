@@ -1,17 +1,24 @@
 use std::fmt::Display;
 
 fn first_marker(chars: usize) -> usize {
-    include_str!("input.txt")
-        .trim()
-        .as_bytes()
-        .windows(chars)
-        .position(|w| {
-            w.iter()
-                .enumerate()
-                .all(|(i, a)| w.iter().skip(i + 1).all(|b| a != b))
-        })
-        .unwrap()
-        + chars
+    chars
+        + include_str!("input.txt")
+            .trim()
+            .as_bytes()
+            .windows(chars)
+            .position(|w| {
+                let mut seen = 0u32;
+                w.iter().all(|&ch| {
+                    let mask = 1 << (ch - b'a');
+                    if seen & mask == 0 {
+                        seen |= mask;
+                        true
+                    } else {
+                        false
+                    }
+                })
+            })
+            .unwrap()
 }
 
 #[inline]

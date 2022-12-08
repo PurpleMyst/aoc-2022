@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 use peeking_take_while::PeekableExt;
 
@@ -12,8 +12,8 @@ pub fn solve() -> (impl Display, impl Display) {
     // once.
     let mut input = include_str!("input.txt").trim().lines().peekable();
 
-    let mut weights: HashMap<usize, u64> = HashMap::new();
-    let mut stack: Vec<usize> = Vec::new();
+    let mut weights: Vec<u64> = Vec::with_capacity(256);
+    let mut stack: Vec<usize> = Vec::with_capacity(16);
     let mut next_id = 0;
 
     while let Some(line) = input.next() {
@@ -22,25 +22,25 @@ pub fn solve() -> (impl Display, impl Display) {
             if dir == ".." {
                 // If we're going up, add the final weight of this directory to our parent.
                 let prev = stack.pop().unwrap();
-                let final_weight = weights[&prev];
-                *weights.entry(*stack.last().unwrap()).or_default() += final_weight;
+                let final_weight = weights[prev];
+                weights[*stack.last().unwrap()] += final_weight;
             } else {
                 // If we're going down, assign this directory an ID.
                 stack.push(next_id);
                 next_id += 1;
+                weights.push(0);
             }
         } else {
             // line must be "$ ls"
             // For each file in the list, add its size to the current directory.
             // Ignoring directories, as those are handled when going up.
             let &cwd = stack.last().unwrap();
-            let cwd_weight = weights.entry(cwd).or_default();
             input
                 .by_ref()
                 .peeking_take_while(|line| !line.starts_with('$'))
                 .map(|line| line.split_once(' ').unwrap())
                 .filter(|&(ty, _)| ty != "dir")
-                .for_each(|(size, _)| *cwd_weight += size.parse::<u64>().unwrap());
+                .for_each(|(size, _)| weights[cwd] += size.parse::<u64>().unwrap());
         }
     }
 
@@ -50,17 +50,17 @@ pub fn solve() -> (impl Display, impl Display) {
         if prev == 0 {
             break;
         }
-        let final_weight = weights[&prev];
-        *weights.entry(*stack.last().unwrap()).or_default() += final_weight;
+        let final_weight = weights[prev];
+        weights[*stack.last().unwrap()] += final_weight;
     }
 
     // Sum up all the small-enough directories.
-    let p1: u64 = weights.values().filter(|&&v| v <= MAX_TO_SUM).sum();
+    let p1: u64 = weights.iter().filter(|&&v| v <= MAX_TO_SUM).sum();
 
     // Get the smallest directory big enough to be worth deleting.
-    let delete_target = NEEDED_SPACE - (DISK_SPACE - weights[&0]);
+    let delete_target = NEEDED_SPACE - (DISK_SPACE - weights[0]);
     let p2 = weights
-        .values()
+        .iter()
         .filter(|&&size| size >= delete_target)
         .min()
         .copied()

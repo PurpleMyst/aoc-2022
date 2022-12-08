@@ -1,68 +1,70 @@
 use std::{collections::HashMap, fmt::Display};
 
 use peeking_take_while::PeekableExt;
-use id_tree::{Tree, Node, InsertBehavior::{AsRoot, UnderNode}};
 
+const MAX_TO_SUM: u64 = 100_000;
 const DISK_SPACE: u64 = 70_000_000;
 const NEEDED_SPACE: u64 = 30_000_000;
 
 #[inline]
 pub fn solve() -> (impl Display, impl Display) {
+    // ASSUMPTION: Directories are listed in DFS order, with no directory being ls-ed more than
+    // once.
     let mut input = include_str!("input.txt").trim().lines().peekable();
 
-    let mut tree = Tree::new();
-
-    let mut weights: HashMap<_, u64> = HashMap::new();
-    let mut stack = Vec::new();
-
-    let mut root = None;
+    let mut weights: HashMap<usize, u64> = HashMap::new();
+    let mut stack: Vec<usize> = Vec::new();
+    let mut next_id = 0;
 
     while let Some(line) = input.next() {
         if let Some(dir) = line.strip_prefix("$ cd ") {
+            // We're changing directory
             if dir == ".." {
-                stack.pop().unwrap();
-            } else if dir == "/" {
-                root = Some(tree.insert(Node::new(0), AsRoot).unwrap());
-                stack.push(root.clone().unwrap());
+                // If we're going up, add the final weight of this directory to our parent.
+                let prev = stack.pop().unwrap();
+                let final_weight = weights[&prev];
+                *weights.entry(*stack.last().unwrap()).or_default() += final_weight;
             } else {
-                stack.push(tree.insert(Node::new(0), UnderNode(stack.last().unwrap())).unwrap());
+                // If we're going down, assign this directory an ID.
+                stack.push(next_id);
+                next_id += 1;
             }
-        } else if line == "$ ls" {
+        } else {
+            // line must be "$ ls"
+            // For each file in the list, add its size to the current directory.
+            // Ignoring directories, as those are handled when going up.
+            let &cwd = stack.last().unwrap();
+            let cwd_weight = weights.entry(cwd).or_default();
             input
                 .by_ref()
                 .peeking_take_while(|line| !line.starts_with('$'))
                 .map(|line| line.split_once(' ').unwrap())
-                .for_each(|(size, _name)| {
-                if size == "dir" { return; }
-                tree.insert(Node::new(size.parse().unwrap()), UnderNode(stack.last().unwrap())).unwrap();
-                });
-        } else {
-            unreachable!();
+                .filter(|&(ty, _)| ty != "dir")
+                .for_each(|(size, _)| *cwd_weight += size.parse::<u64>().unwrap());
         }
     }
-    let root = root.unwrap();
 
-    tree.traverse_post_order_ids(&root).unwrap().for_each(|node_id| {
-        let node = tree.get(&node_id).unwrap();
-        let Some(parent) = node.parent() else { return; };
-        *weights.entry(parent).or_default() += if *node.data() == 0 {
-         weights[&node_id]
-        } else {
-            *node.data()
-        };
-    });
-
-    let p1: u64 = weights.values().filter(|&&v| v <= 100_000).sum();
-
-    let delete_target = NEEDED_SPACE - (DISK_SPACE - weights[&root]);
-
-    let p2 = tree.traverse_pre_order_ids(&root).unwrap().filter_map(|node_id| {
-        let Some(&size) = weights.get(&node_id) else { return None; };
-        if size < delete_target {
-            return None;
+    // After our traversal is over, add up what we didn't `cd` out of.
+    loop {
+        let prev = stack.pop().unwrap();
+        if prev == 0 {
+            break;
         }
-        Some(size)
-    }).min().unwrap();
+        let final_weight = weights[&prev];
+        *weights.entry(*stack.last().unwrap()).or_default() += final_weight;
+    }
+
+    // Sum up all the small-enough directories.
+    let p1: u64 = weights.values().filter(|&&v| v <= MAX_TO_SUM).sum();
+
+    // Get the smallest directory big enough to be worth deleting.
+    let delete_target = NEEDED_SPACE - (DISK_SPACE - weights[&0]);
+    let p2 = weights
+        .values()
+        .filter(|&&size| size >= delete_target)
+        .min()
+        .copied()
+        .unwrap();
 
     (p1, p2)
 }

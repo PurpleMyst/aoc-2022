@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-type Point = (i64, i64);
+type Point = (i16, i16);
 
 const PART2_KNOTS: usize = 10;
 
@@ -17,9 +17,9 @@ fn simulate_part1() -> usize {
     let mut tail = (0, 0);
 
     let mut visited = fnv::FnvHashSet::default();
+    visited.reserve(7168);
     visited.insert(tail);
 
-    // stdout().execute(EnterAlternateScreen).unwrap();
     include_str!("input.txt")
         .lines()
         .map(|line| line.split_once(' ').unwrap())
@@ -48,9 +48,9 @@ fn simulate_part2() -> usize {
     let mut knots = [(0, 0); PART2_KNOTS];
 
     let mut visited = fnv::FnvHashSet::default();
+    visited.reserve(3584);
     visited.insert(knots.last().copied().unwrap());
 
-    // stdout().execute(EnterAlternateScreen).unwrap();
     include_str!("input.txt")
         .lines()
         .map(|line| line.split_once(' ').unwrap())
@@ -68,7 +68,9 @@ fn simulate_part2() -> usize {
                 for i in 1..PART2_KNOTS {
                     if !touching(knots[i - 1], knots[i]) {
                         knots[i] = next_tail_pos(knots[i - 1], knots[i]);
-                    }
+                        } else {
+                            break;
+                        }
                 }
                 visited.insert(knots.last().copied().unwrap());
             }

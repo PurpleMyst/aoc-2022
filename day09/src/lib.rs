@@ -68,9 +68,9 @@ fn simulate_part2() -> usize {
                 for i in 1..PART2_KNOTS {
                     if !touching(knots[i - 1], knots[i]) {
                         knots[i] = next_tail_pos(knots[i - 1], knots[i]);
-                        } else {
-                            break;
-                        }
+                    } else {
+                        break;
+                    }
                 }
                 visited.insert(knots.last().copied().unwrap());
             }

@@ -46,6 +46,9 @@ run = partial(subprocess.run, check=True)
 def add_line(p: Path, l: str) -> None:
     ls = p.read_text().splitlines()
     ls.insert(-1, l)
+    if ls[-1] != "":
+        # add or keep trailing newline
+        ls.append("")
     p.write_text("\n".join(ls), newline="\n")
 
 

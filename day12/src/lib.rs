@@ -13,10 +13,9 @@ fn height(ch: u8) -> u8 {
     }) - b'a'
 }
 
-#[inline]
-pub fn solve() -> (impl Display, impl Display) {
+pub fn do_solve(input: &str) -> (i32, i32) {
     // Calculate the grid size and create a Graph with the needed capacity
-    let input = include_str!("input.txt").trim();
+    let input = input.trim();
     let width = input.find('\n').unwrap();
     let grid_size = width * (1 + input.bytes().filter(|&ch| ch == b'\n').count());
     let mut graph: Graph<(), (), Directed, u32> = Graph::with_capacity(grid_size, 4 * grid_size);
@@ -97,4 +96,9 @@ pub fn solve() -> (impl Display, impl Display) {
     }
 
     (p1, p2)
+}
+
+#[inline]
+pub fn solve() -> (impl Display, impl Display) {
+    do_solve(include_str!("input.txt"))
 }

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use petgraph::{algo::dijkstra, matrix_graph::DiMatrix, prelude::*};
+use petgraph::{algo::dijkstra, prelude::*};
 
 fn height(ch: u8) -> u8 {
     (match ch {
@@ -15,14 +15,13 @@ fn height(ch: u8) -> u8 {
 pub fn solve() -> (impl Display, impl Display) {
     let input = include_str!("input.txt").trim();
     let width = input.find('\n').unwrap();
-
-    let mut graph: DiMatrix<_, _, Option<()>, _> =
-        DiMatrix::with_capacity(input.bytes().filter(|&ch| ch == b'\n').count() * width);
+    let grid_size = width * input.bytes().filter(|&ch| ch == b'\n').count();
+    let mut graph: Graph<(), (), Directed, u32> = Graph::with_capacity(grid_size, 4 * grid_size);
 
     let mut start = None;
     let mut end = None;
     let mut lows = Vec::new();
-    let grid_data: Vec<(u8, NodeIndex<u16>)> = input
+    let grid_data: Vec<(u8, NodeIndex<_>)> = input
         .bytes()
         .filter(|ch| matches!(ch, b'a'..=b'z' | b'S' | b'E'))
         .map(|ch| (ch, graph.add_node(())))
@@ -35,6 +34,8 @@ pub fn solve() -> (impl Display, impl Display) {
         .map(|(ch, idx)| (height(ch), idx))
         .collect();
     let grid = grid::Grid::from_vec(grid_data, width);
+    let start = start.unwrap();
+    let end = end.unwrap();
 
     for y in 0..grid.rows() {
         for x in 0..grid.cols() {
@@ -61,8 +62,8 @@ pub fn solve() -> (impl Display, impl Display) {
         }
     }
 
-    let costs = dijkstra(&graph, end.unwrap(), None, |_| 1);
-    let p1 = costs[&start.unwrap()];
+    let costs = dijkstra(&graph, end, None, |_| 1);
+    let p1 = costs[&start];
     let p2 = lows
         .into_iter()
         .flat_map(|idx| costs.get(&idx).copied())

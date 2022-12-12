@@ -1,4 +1,4 @@
-use std::{cmp, collections::VecDeque, fmt::Display, str::Lines};
+use std::{cmp, fmt::Display, str::Lines};
 
 use itertools::Itertools;
 
@@ -36,7 +36,7 @@ impl Operation {
 
 #[derive(Debug, Clone)]
 struct Monkey {
-    items: VecDeque<u64>,
+    items: Vec<u64>,
     operation: Operation,
     test: u64,
     targets: (usize, usize),
@@ -91,18 +91,21 @@ impl Monkey {
         }
     }
 
-    fn inspect_one(&mut self, divide_by_three: bool, lcm: u64) -> Option<(usize, u64)> {
-        let mut item = self.operation.new(self.items.pop_front()?) % lcm;
-        if divide_by_three {
-            item /= 3;
+    fn turn(&mut self, divide_by_three: bool, lcm: u64, buf: &mut [Vec<u64>]) {
+        self.inspected += self.items.len();
+
+        for mut item in self.items.drain(..) {
+            item = self.operation.new(item) % lcm;
+            if divide_by_three {
+                item /= 3;
+            }
+            let target = if item % self.test == 0 {
+                self.targets.0
+            } else {
+                self.targets.1
+            };
+            buf[target].push(item);
         }
-        self.inspected += 1;
-        let target = if item % self.test == 0 {
-            self.targets.0
-        } else {
-            self.targets.1
-        };
-        Some((target, item))
     }
 }
 
@@ -111,11 +114,12 @@ fn simulate(mut monkeys: Vec<Monkey>, rounds: usize, divide_by_three: bool) -> u
         .iter()
         .fold(1, |acc, monkey| num_integer::lcm(acc, monkey.test));
 
+    let mut buf = vec![Vec::with_capacity(32); monkeys.len()];
+
     for _ in 0..rounds {
-        for idx in 0..monkeys.len() {
-            while let Some((target, value)) = monkeys[idx].inspect_one(divide_by_three, lcm) {
-                monkeys[target].items.push_back(value);
-            }
+        for (idx, monkey) in monkeys.iter_mut().enumerate() {
+            monkey.items.append(&mut buf[idx]);
+            monkey.turn(divide_by_three, lcm, &mut buf);
         }
     }
 

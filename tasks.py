@@ -230,6 +230,7 @@ def answer(
 @in_root_dir
 @year_and_day
 def fetch_problem(year: int = DEFAULT_YEAR, day: int = DEFAULT_DAY) -> None:
+    "Fetch the problem statement."
     resp = session.get(f"https://adventofcode.com/{year}/day/{day}")
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, features="html.parser").main

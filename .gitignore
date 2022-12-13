@@ -2,3 +2,4 @@ target/
 session.txt
 problem.md
 sample_input.txt
+.env

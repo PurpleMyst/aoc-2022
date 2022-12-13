@@ -1,17 +1,24 @@
 import datetime
+import shlex
 import subprocess
+import sys
+import typing as t
 import webbrowser
 from functools import partial, wraps
 from os import chdir, environ
 from pathlib import Path
 
 import browser_cookie3
-from bs4 import BeautifulSoup
-from bs4.element import Tag
 import html2text
 import requests
 import toml
 from argh import aliases, arg, dispatch_commands, named, wrap_errors
+from bs4 import BeautifulSoup
+from bs4.element import Tag
+from dotenv import load_dotenv
+from termcolor import colored as c
+
+cb = partial(c, attrs=["bold"])
 
 MAIN = """\
 fn main() {{
@@ -36,11 +43,28 @@ NOW = datetime.datetime.now()
 DEFAULT_DAY = NOW.day
 DEFAULT_YEAR = NOW.year
 
+load_dotenv()
+
 session = requests.Session()
-session.cookies.update(browser_cookie3.load(domain_name="adventofcode.com"))
+if "SESSION_COOKIE" in environ:
+    session.cookies.update({"session": environ["SESSION_COOKIE"]})
+else:
+    session.cookies.update(browser_cookie3.load(domain_name="adventofcode.com"))
 session.headers.update({"User-Agent": "PurpleMyst/aoc-template with much love! <3"})
 
-run = partial(subprocess.run, check=True)
+
+def run(cmd: t.Sequence[str | Path], /, **kwargs) -> subprocess.CompletedProcess:
+    check = kwargs.pop("check", True)
+    print(
+        cb("$", "green"),
+        shlex.join(map(str, cmd)),
+        c(f"(w/ options {kwargs})", "green") if kwargs else "",
+    )
+    proc = subprocess.run(cmd, **kwargs)
+    if check and proc.returncode != 0:
+        print(cb("Failed.", "red"))
+        sys.exit(proc.returncode)
+    return proc
 
 
 def add_line(p: Path, l: str) -> None:
@@ -239,6 +263,16 @@ def fetch_problem(year: int = DEFAULT_YEAR, day: int = DEFAULT_DAY) -> None:
     Path(f"day{day:02}", "problem.md").write_text(t)
 
 
+def show_session_cookie() -> None:
+    "Conquer outer space."
+    print(c("Your session cookie:", "yellow"), session.cookies["session"])
+
+
+def update_pipreqs() -> None:
+    "Update the requirements.txt file via pipreqs."
+    run(("pipreqs", ".", "--force"))
+
+
 def main() -> None:
     environ["RUST_BACKTRACE"] = "1"
     dispatch_commands(
@@ -254,6 +288,8 @@ def main() -> None:
             run_release,
             run_prototype,
             fetch_problem,
+            update_pipreqs,
+            show_session_cookie,
         ),
     )
 

@@ -4,32 +4,32 @@ use itertools::Itertools;
 
 #[derive(Debug, Clone)]
 enum Operation {
-    IncrementOld(u64),
-    ScaleOld(u64),
-    SquareOld,
+    Increment(u64),
+    Scale(u64),
+    Square,
 }
 
 impl Operation {
     fn parse(s: &str) -> Self {
         if s == "new = old * old" {
-            return Self::SquareOld;
+            return Self::Square;
         }
 
         let mut parts = s.split(' ').skip(3);
         let op = parts.next().unwrap();
         let rhs = parts.next().unwrap().parse().unwrap();
         match op {
-            "+" => Self::IncrementOld(rhs),
-            "*" => Self::ScaleOld(rhs),
+            "+" => Self::Increment(rhs),
+            "*" => Self::Scale(rhs),
             _ => unreachable!(),
         }
     }
 
-    fn new(&self, old: u64) -> u64 {
+    fn apply(&self, old: u64) -> u64 {
         match self {
-            Operation::IncrementOld(m) => old + m,
-            Operation::ScaleOld(m) => old * m,
-            Operation::SquareOld => old * old,
+            Operation::Increment(m) => old + m,
+            Operation::Scale(m) => old * m,
+            Operation::Square => old * old,
         }
     }
 }
@@ -95,7 +95,7 @@ impl Monkey {
         self.inspected += self.items.len();
 
         for mut item in self.items.drain(..) {
-            item = self.operation.new(item) % lcm;
+            item = self.operation.apply(item) % lcm;
             if divide_by_three {
                 item /= 3;
             }

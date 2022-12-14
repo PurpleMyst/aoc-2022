@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use ahash::HashSet;
+
 type Point = (i16, i16);
 
 const PART2_KNOTS: usize = 10;
@@ -16,7 +18,7 @@ fn simulate_part1() -> usize {
     let mut head = (0, 0);
     let mut tail = (0, 0);
 
-    let mut visited = fnv::FnvHashSet::default();
+    let mut visited = HashSet::default();
     visited.reserve(7168);
     visited.insert(tail);
 
@@ -47,7 +49,7 @@ fn simulate_part1() -> usize {
 fn simulate_part2() -> usize {
     let mut knots = [(0, 0); PART2_KNOTS];
 
-    let mut visited = fnv::FnvHashSet::default();
+    let mut visited = HashSet::default();
     visited.reserve(3584);
     visited.insert(knots.last().copied().unwrap());
 

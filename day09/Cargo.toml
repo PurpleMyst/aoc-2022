@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-fnv = "1.0.7"
+ahash = "0.8.2"

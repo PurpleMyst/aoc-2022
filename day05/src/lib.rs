@@ -35,7 +35,7 @@ pub fn solve() -> (impl Display, impl Display) {
 
     initial_state
         .lines()
-        .take_while(|row| row.bytes().nth(1).map_or(false, |ch| !ch.is_ascii_digit()))
+        .take_while(|row| row.as_bytes().get(1).map_or(false, |ch| !ch.is_ascii_digit()))
         .for_each(|row| {
             stacks
                 .iter_mut()

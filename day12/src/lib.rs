@@ -30,10 +30,10 @@ pub fn do_solve(input: &str) -> (i32, i32) {
         .filter(|ch| matches!(ch, b'a'..=b'z' | b'S' | b'E'))
         .map(|ch| (ch, graph.add_node(())))
         .inspect(|(ch, idx)| match ch {
-            b'S' => start = Some(idx.clone()),
-            b'E' => end = Some(idx.clone()),
+            b'S' => start = Some(*idx),
+            b'E' => end = Some(*idx),
             b'a' => {
-                lows.visit(idx.clone());
+                lows.visit(*idx);
             }
             _ => {}
         })
@@ -90,7 +90,7 @@ pub fn do_solve(input: &str) -> (i32, i32) {
         stack.extend(
             graph
                 .neighbors(node)
-                .filter(|neighbor| visited.visit(neighbor.clone()))
+                .filter(|neighbor| visited.visit(*neighbor))
                 .map(|neighbor| (neighbor, steps + 1)),
         );
     }

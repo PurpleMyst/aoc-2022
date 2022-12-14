@@ -40,7 +40,7 @@ fn parse_item(cs: &mut Chars) -> Item {
         Item::List(contents)
     } else {
         let s = cs.as_str();
-        let len = s.find(&[',', ']']).unwrap_or(s.len());
+        let len = s.find([',', ']']).unwrap_or(s.len());
         let item = s[..len].parse().unwrap();
         cs.take(len).for_each(|_| ());
         Item::Atom(item)

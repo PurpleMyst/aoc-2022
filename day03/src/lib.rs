@@ -5,7 +5,7 @@ use std::fmt::Display;
 fn parse_compartment(s: &str) -> u64 {
     let mut result = 0;
     s.bytes().for_each(|b| {
-        debug_assert!(matches!(b, b'a'..=b'z' | b'A'..=b'Z'));
+        debug_assert!(b.is_ascii_alphabetic());
         result |= if b.is_ascii_lowercase() {
             1 << (b - b'a')
         } else {

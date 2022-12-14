@@ -1,10 +1,13 @@
 use std::{collections::HashSet, fmt::Display, ops::RangeInclusive};
 
-type Point = (i64, i64);
+use ahash::RandomState;
+
+type Point = (u16, u16);
+type PointSet = HashSet<Point, RandomState>;
 
 const SAND_SOURCE: Point = (500, 0);
 
-fn range(a: i64, b: i64) -> RangeInclusive<i64> {
+fn range(a: u16, b: u16) -> RangeInclusive<u16> {
     if a < b {
         a..=b
     } else {
@@ -12,13 +15,24 @@ fn range(a: i64, b: i64) -> RangeInclusive<i64> {
     }
 }
 
-fn is_occupied(walls: &HashSet<Point>, death_y: i64, p: &Point) -> bool {
-    walls.contains(&p) || p.1 == death_y + 2
+fn solve_part2(walls: &PointSet, death_y: u16) -> usize {
+    let mut stack = vec![SAND_SOURCE];
+    let mut visited = PointSet::default();
+    while let Some((x, y)) = stack.pop() {
+        stack.extend(
+            [(x, y + 1), (x - 1, y + 1), (x + 1, y + 1)]
+                .into_iter()
+                .filter(|&(_, y)| y < death_y + 2)
+                .filter(|p| !walls.contains(p))
+                .filter(|&p| visited.insert(p)),
+        )
+    }
+    1 + visited.len()
 }
 
 #[inline]
 pub fn solve() -> (impl Display, impl Display) {
-    let mut walls: HashSet<Point> = HashSet::new();
+    let mut walls = PointSet::default();
 
     include_str!("input.txt").lines().for_each(|line| {
         let points = line.split(" -> ").map(|p| {
@@ -42,15 +56,17 @@ pub fn solve() -> (impl Display, impl Display) {
             cur
         });
     });
+
     let &death_y = walls.iter().map(|(_, y)| y).max().unwrap();
 
-    let mut p1 = None;
-    let mut dropped = 0;
-    loop {
+    let p2 = solve_part2(&walls, death_y);
+
+    let mut p1 = 0;
+    'outer: loop {
         let mut sand = SAND_SOURCE;
         loop {
-            if sand.1 > death_y && p1.is_none() {
-                p1 = Some(dropped);
+            if sand.1 >= death_y {
+                break 'outer;
             }
 
             let candidates = [
@@ -58,21 +74,15 @@ pub fn solve() -> (impl Display, impl Display) {
                 (sand.0 - 1, sand.1 + 1),
                 (sand.0 + 1, sand.1 + 1),
             ];
-            if let Some(next) = candidates
-                .into_iter()
-                .find(|p| !is_occupied(&walls, death_y, p))
-            {
+            if let Some(next) = candidates.into_iter().find(|p| !walls.contains(p)) {
                 sand = next;
             } else {
                 break;
             }
         }
-        dropped += 1;
+        p1 += 1;
         walls.insert(sand);
-        if sand == SAND_SOURCE {
-            break;
-        }
     }
 
-    (p1.unwrap(), dropped)
+    (p1, p2)
 }

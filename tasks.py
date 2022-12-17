@@ -23,8 +23,8 @@ cb = partial(c, attrs=["bold"])
 MAIN = """\
 fn main() {{
     let (part1, part2) = {crate}::solve();
-    println!("{{}}", part1);
-    println!("{{}}", part2);
+    println!("{{part1}}");
+    println!("{{part2}}");
 }}\
 """
 

@@ -33,6 +33,7 @@ dependencies = [
  "day12",
  "day13",
  "day14",
+ "day16",
  "iai",
 ]
 
@@ -287,6 +288,15 @@ name = "day14"
 version = "0.1.0"
 dependencies = [
  "ahash",
+]
+
+[[package]]
+name = "day16"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "itertools",
+ "petgraph",
 ]
 
 [[package]]

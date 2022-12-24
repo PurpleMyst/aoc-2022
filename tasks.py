@@ -209,7 +209,8 @@ def watch_run() -> None:
 @aliases("r")
 @named("run")
 def do_run() -> None:
-    "Run the solution."
+    "Run the solution in debug mode."
+    del environ["RUSTFLAGS"]
     run(("cargo", "run"))
 
 

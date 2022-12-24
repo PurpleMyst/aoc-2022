@@ -5,60 +5,29 @@ use ahash::HashMap;
 use itertools::Itertools;
 use petgraph::prelude::*;
 
-#[derive(Clone, Copy, Debug, Default)]
-struct Opened(u16);
+mod state;
+use state::*;
 
-impl Opened {
-    fn update(self, idx: NodeIndex) -> Self {
-        Self(self.0 | (1 << idx.index()))
-    }
+fn solve_part<const PART2: bool>(initial_state: State<PART2>, flows: &[u16; 16], distances: &[u8; 256]) -> u16 {
+    let mut states = priority_queue::PriorityQueue::<_, _, ahash::RandomState>::default();
+    let mut lower_bound = 0;
 
-    fn contains(self, idx: NodeIndex) -> bool {
-        (self.0 & (1 << idx.index())) != 0
-    }
-}
-
-trait ProblemState: Sized {
-    fn initial(position: NodeIndex) -> Self;
-    fn time_left(&self) -> u8;
-    fn per_second(&self) -> u16;
-    fn total(&self) -> u16;
-    fn opened(&self) -> Opened;
-    fn advance(self, graph: &UnGraph<u16, u8>, states: &mut Vec<Self>);
-}
-
-mod part1;
-mod part2;
-
-fn solve_part<PS: ProblemState>(start: NodeIndex, graph: &UnGraph<u16, u8>) -> u16 {
-    let mut states = Vec::new();
-    let mut problem_lower_bound = 0;
-    let total_flow_rate: u16 = graph.node_weights().sum();
-    states.push(PS::initial(start));
-    while let Some(state) = states.pop() {
-        // Calculate what we could get if everything was open and we stood still from this point
-        // onwards
-        let upper_bound = state.total() + total_flow_rate * u16::from(state.time_left());
-
-        // If that's less than our lower bound, this state isn't worth exploring.
-        if upper_bound < problem_lower_bound {
+    states.push(initial_state, 0);
+    while let Some((state, _)) = states.pop() {
+        let upper_bound = state.upper_bound();
+        if upper_bound < lower_bound {
             continue;
         }
 
-        // Otherwise, if our upper bound corresponds to our final total, consider this a single candidate solution.
-        if state.time_left() == 0 || state.per_second() == total_flow_rate {
-            if upper_bound > problem_lower_bound {
-                eprint!("\x1b[34;1m{upper_bound:4} \x1b[0m");
+        let old_len = states.len();
+        states.extend(state.advance(flows, distances).map(|state| (state, state.relieved())));
+        if states.len() == old_len {
+            if state.relieved() > lower_bound {
+                lower_bound = state.relieved();
             }
-            problem_lower_bound = problem_lower_bound.max(upper_bound);
-            continue;
         }
-
-        // Advance this state if it wasn't a single candidate solution yet.
-        state.advance(graph, &mut states);
     }
-    eprintln!();
-    problem_lower_bound
+    lower_bound
 }
 
 #[inline]
@@ -100,10 +69,38 @@ pub fn solve() -> (impl Display, impl Display) {
     }
 
     // Convert the graphmap into an adjacency list which is must faster.
-    let graph = graph.into_graph();
+    let graph = graph.into_graph::<u8>();
     let start = graph.node_indices().find(|&idx| graph[idx] == "AA").unwrap();
     let graph = graph.map(|_, node_name| flow_rates[node_name], |_, &e| e);
-    debug_assert!(graph.node_count() <= 16);
+    debug_assert!(graph.node_count() == 16);
+    debug_assert_eq!(start.index(), 0);
+    let total_flow: u16 = graph.node_weights().sum();
 
-    (solve_part::<part1::State>(start, &graph), 0)
+    // Convert the adjacency list into a 2x2 distance matrix via Floyd-Warshall
+    let mut flows = [0; 16];
+    let mut distances = [u8::MAX; 16 * 16];
+    for i in 0..16 {
+        flows[i] = *graph.node_weight(NodeIndex::new(i)).unwrap();
+    }
+    for edge in graph.edge_references() {
+        distances[edge.source().index() * 16 + edge.target().index()] = *edge.weight();
+        distances[edge.target().index() * 16 + edge.source().index()] = *edge.weight();
+    }
+    for k in 0..16 {
+        distances[k * 16 + k] = 0;
+
+        for i in 0..16 {
+            for j in 0..16 {
+                if let Some(result) = distances[i * 16 + k].checked_add(distances[k * 16 + j]) {
+                    if distances[i * 16 + j] > result {
+                        distances[i * 16 + j] = result;
+                    }
+                }
+            }
+        }
+    }
+
+    let p1 = solve_part::<false>(State::new(total_flow), &flows, &distances);
+    let p2 = solve_part::<true>(State::new(total_flow), &flows, &distances);
+    (p1, p2)
 }

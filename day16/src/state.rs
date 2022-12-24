@@ -1,17 +1,15 @@
 use std::fmt::Debug;
 
-use super::*;
-
 #[derive(Clone, Copy, Default, Hash, PartialEq, Eq)]
 pub struct Opened(u16);
 
 impl Opened {
-    pub fn update(self, idx: NodeIndex) -> Self {
-        Self(self.0 | (1 << idx.index()))
+    pub fn update(self, idx: usize) -> Self {
+        Self(self.0 | (1 << idx))
     }
 
-    pub fn contains(self, idx: NodeIndex) -> bool {
-        (self.0 & (1 << idx.index())) != 0
+    pub fn contains(self, idx: usize) -> bool {
+        (self.0 & (1 << idx)) != 0
     }
 }
 
@@ -27,22 +25,27 @@ pub struct State<const PART2: bool> {
     relieved: u16,
     hypothetical_flow: u16,
     time_left: u8,
-    position: NodeIndex,
+    position: u8,
     can_rewind: bool,
 }
 
 impl<const PART2: bool> State<PART2> {
+    pub const START: u8 = 0;
     const SECONDS: u8 = if PART2 { 26 } else { 30 };
 
     pub fn new(hypothetical_flow: u16) -> Self {
         Self {
             opened: Opened::default(),
-            position: NodeIndex::new(0),
+            position: Self::START,
             relieved: 0,
             hypothetical_flow,
             time_left: Self::SECONDS,
             can_rewind: PART2,
         }
+    }
+
+    pub fn relieved(&self) -> u16 {
+        self.relieved
     }
 
     pub fn upper_bound(&self) -> u16 {
@@ -53,39 +56,34 @@ impl<const PART2: bool> State<PART2> {
         }
     }
 
-    pub fn advance<'a>(self, flows: &'a [u16; 16], distances: &'a [u8; 256]) -> impl Iterator<Item = Self> + 'a {
-        let hops = (0..16)
-            .map(NodeIndex::new)
-            .filter(move |&idx| !self.opened.contains(idx))
-            .filter_map(move |next| {
-                let flow = flows[next.index()];
-                let distance = distances[self.position.index() * 16 + next.index()];
-                let new_time_left = self.time_left.checked_sub(distance + 1)?;
-                Some(Self {
-                    time_left: new_time_left,
-                    relieved: self.relieved + u16::from(new_time_left) * flow,
-                    opened: self.opened.update(next),
-                    position: next,
-                    hypothetical_flow: self.hypothetical_flow - flow,
-                    ..self
-                })
-            });
+    pub fn advance(self, flows: &[u16; 16], distances: &[u8; 256], states: &mut impl Extend<Self>) {
+        // Try to open each valve that isn't currently open.
+        states.extend(
+            flows
+                .iter()
+                .copied()
+                .enumerate()
+                .filter(move |&(valve, _)| !self.opened.contains(valve))
+                .filter_map(move |(valve, flow)| {
+                    let distance = distances[self.position as usize * 16 + valve];
+                    let new_time_left = self.time_left.checked_sub(distance + 1)?;
+                    Some(Self {
+                        time_left: new_time_left,
+                        relieved: self.relieved + u16::from(new_time_left) * flow,
+                        opened: self.opened.update(valve),
+                        position: valve as u8,
+                        hypothetical_flow: self.hypothetical_flow - flow,
+                        ..self
+                    })
+                }),
+        );
 
-        let rewind = if self.can_rewind {
-            Some(Self {
-                position: NodeIndex::new(0),
-                time_left: Self::SECONDS,
-                can_rewind: false,
-                ..self
-            })
-        } else {
-            None
-        };
-
-        hops.chain(rewind)
-    }
-
-    pub fn relieved(&self) -> u16 {
-        self.relieved
+        // Try to rewind if we can do so.
+        states.extend(self.can_rewind.then_some(Self {
+            position: Self::START,
+            time_left: Self::SECONDS,
+            can_rewind: false,
+            ..self
+        }));
     }
 }

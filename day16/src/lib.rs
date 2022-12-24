@@ -1,4 +1,5 @@
 #![feature(str_split_as_str)]
+#![warn(clippy::perf)]
 use std::fmt::Display;
 
 use ahash::HashMap;
@@ -6,25 +7,27 @@ use itertools::Itertools;
 use petgraph::prelude::*;
 
 mod state;
-use state::*;
+use state::State;
+
+const NODE_COUNT: usize = 16;
 
 fn solve_part<const PART2: bool>(initial_state: State<PART2>, flows: &[u16; 16], distances: &[u8; 256]) -> u16 {
-    let mut states = binary_heap_plus::BinaryHeap::new_by_key(|state: &State<PART2>| state.relieved());
+    let mut states = binary_heap_plus::BinaryHeap::with_capacity_by_key(128, State::<PART2>::relieved);
     let mut lower_bound = 0;
 
     states.push(initial_state);
     while let Some(state) = states.pop() {
-        let upper_bound = state.upper_bound();
-        if upper_bound < lower_bound {
+        // Bound: If this state's best case scenario is worse than the best we've gotten so far, skip it.
+        if state.upper_bound() < lower_bound {
             continue;
         }
 
+        // Branch: Try to branch starting from this state.
         let old_len = states.len();
-        states.extend(state.advance(flows, distances));
-        if states.len() == old_len {
-            if state.relieved() > lower_bound {
-                lower_bound = state.relieved();
-            }
+        state.advance(flows, distances, &mut states);
+        // If we added no states, this solution has reached its end: check it against the lower bound.
+        if states.len() == old_len && state.relieved() > lower_bound {
+            lower_bound = state.relieved();
         }
     }
     lower_bound
@@ -72,15 +75,15 @@ pub fn solve() -> (impl Display, impl Display) {
     let graph = graph.into_graph::<u8>();
     let start = graph.node_indices().find(|&idx| graph[idx] == "AA").unwrap();
     let graph = graph.map(|_, node_name| flow_rates[node_name], |_, &e| e);
-    debug_assert!(graph.node_count() == 16);
-    debug_assert_eq!(start.index(), 0);
+    debug_assert!(graph.node_count() == NODE_COUNT);
+    debug_assert_eq!(start.index(), State::<false>::START as usize);
     let total_flow: u16 = graph.node_weights().sum();
 
     // Convert the adjacency list into a 2x2 distance matrix via Floyd-Warshall
     let mut flows = [0; 16];
     let mut distances = [u8::MAX; 16 * 16];
-    for i in 0..16 {
-        flows[i] = *graph.node_weight(NodeIndex::new(i)).unwrap();
+    for (valve, flow) in flows.iter_mut().enumerate() {
+        *flow = *graph.node_weight(NodeIndex::new(valve)).unwrap();
     }
     for edge in graph.edge_references() {
         distances[edge.source().index() * 16 + edge.target().index()] = *edge.weight();

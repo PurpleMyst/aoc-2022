@@ -9,18 +9,18 @@ mod state;
 use state::*;
 
 fn solve_part<const PART2: bool>(initial_state: State<PART2>, flows: &[u16; 16], distances: &[u8; 256]) -> u16 {
-    let mut states = priority_queue::PriorityQueue::<_, _, ahash::RandomState>::default();
+    let mut states = binary_heap_plus::BinaryHeap::new_by_key(|state: &State<PART2>| state.relieved());
     let mut lower_bound = 0;
 
-    states.push(initial_state, 0);
-    while let Some((state, _)) = states.pop() {
+    states.push(initial_state);
+    while let Some(state) = states.pop() {
         let upper_bound = state.upper_bound();
         if upper_bound < lower_bound {
             continue;
         }
 
         let old_len = states.len();
-        states.extend(state.advance(flows, distances).map(|state| (state, state.relieved())));
+        states.extend(state.advance(flows, distances));
         if states.len() == old_len {
             if state.relieved() > lower_bound {
                 lower_bound = state.relieved();

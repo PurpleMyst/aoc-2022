@@ -353,6 +353,14 @@ name = "day18"
 version = "0.1.0"
 
 [[package]]
+name = "day19"
+version = "0.1.0"
+dependencies = [
+ "binary-heap-plus",
+ "rayon",
+]
+
+[[package]]
 name = "either"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

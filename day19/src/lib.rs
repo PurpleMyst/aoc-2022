@@ -2,14 +2,19 @@
 
 use std::{fmt::Display, iter::once, time::Instant};
 
-use binary_heap_plus::BinaryHeap;
 use rayon::prelude::*;
+use derive_more::{Deref, DerefMut};
 
-#[derive(Debug, Clone, Copy, Default)]
+const ORE: usize = 0;
+const CLAY: usize = 1;
+const OBSIDIAN: usize = 2;
+const GEODE: usize = 3;
+
+#[derive(Debug, Clone, Copy, Default, Deref, DerefMut)]
 struct RobotCost([u8; 3]);
 
-#[derive(Debug, Clone, Copy, Default)]
-struct Blueprint([RobotCost; 4]);
+#[derive(Debug, Clone, Copy, Default, Deref, DerefMut)]
+struct Blueprint { #[deref] #[deref_mut] robot_costs: [RobotCost; 4], max_cost_per_resource: [u8; 3] }
 
 impl RobotCost {
     fn parse(s: &str) -> Self {
@@ -22,9 +27,9 @@ impl RobotCost {
             let (n, ty) = r.split_once(' ').unwrap();
             let n: u8 = n.parse().unwrap();
             let c = match ty {
-                "ore" | "ore." => &mut this.0[0],
-                "clay" | "clay." => &mut this.0[1],
-                "obsidian" | "obsidian." => &mut this.0[2],
+                "ore" | "ore." => &mut this[ORE],
+                "clay" | "clay." => &mut this[CLAY],
+                "obsidian" | "obsidian." => &mut this[OBSIDIAN],
                 _ => unreachable!(),
             };
             *c += n;
@@ -42,83 +47,129 @@ impl Blueprint {
             .split(". ")
             .map(|s| s.split_once(" costs ").unwrap().1)
             .map(RobotCost::parse);
-        Self([
+        let robot_costs = [
             costs.next().unwrap(),
             costs.next().unwrap(),
             costs.next().unwrap(),
             costs.next().unwrap(),
-        ])
+        ] ;
+        let max_per_resource = [ORE, CLAY, OBSIDIAN]
+            .map(|idx| robot_costs.iter().map(|rc| rc[idx]).max().unwrap());
+        Self { robot_costs, max_cost_per_resource: max_per_resource }
     }
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-struct Resource {
-    robots: usize,
-    amount: usize,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 struct State {
-    time_left: usize,
-    resources: [Resource; 4],
+    time_left: u16,
+    amounts: [u16; 4],
+    robots: [u16; 4],
 }
 
 impl State {
-    fn total(&self) -> usize {
-        self.resources[3].amount
+    /// How many geodes have we gotten so far?
+    fn geodes(&self) -> u16 {
+        self.amounts[GEODE]
     }
 
-    fn priority(&self) -> impl Ord {
-        self.total()
+    /// How many geodes can we get at most from this state?
+    fn upper_bound(&self) -> u16 {
+        self.amounts[GEODE] + self.robots[GEODE] * self.time_left + (1..self.time_left).sum::<u16>()
     }
 
-    fn upper_bound(&self) -> usize {
-        self.resources[3].amount + (0..self.time_left).map(|t| self.resources[3].robots + t).sum::<usize>()
+    /// Make time pass and generate resources.
+    fn advance_time(&mut self, t: u16) {
+        self.amounts
+            .iter_mut()
+            .zip(self.robots.iter())
+            .for_each(|(amount, robots)| *amount += robots * t);
+        self.time_left -= t;
     }
 
-    fn tick(&mut self, n: usize) {
-        self.resources.iter_mut().for_each(|r| {
-            r.amount += r.robots * n;
+    fn time_to_build(&self, costs: &RobotCost) -> Option<u16> {
+        let mut result = 0;
+        for ((have, robots), cost) in self
+            .amounts
+            .into_iter()
+            .zip(self.robots.into_iter())
+            .zip(costs.into_iter().map(u16::from))
+        {
+            let need = cost.saturating_sub(have);
+            if robots == 0 {
+                if need == 0 {
+                    continue;
+                } else {
+                    return None;
+                }
+            }
+            result = result.max(need.div_ceil(robots));
+        }
+        Some(result)
+    }
+
+    /// Build a robot, subtracting its cost.
+    fn build(&mut self, idx: usize, cost: &RobotCost) {
+        self.robots[idx] += 1;
+        self.amounts.iter_mut().zip(cost.into_iter()).for_each(|(amount, c)| {
+            *amount -= u16::from(c);
         });
-        self.time_left -= n;
     }
 
-    fn advance_micro(&self, blueprint: &Blueprint, states: &mut impl Extend<State>) {
+    /// Can we always build one geode robot from this point forward?
+    fn can_always_build(&self, cost: &RobotCost) -> bool {
+        self.robots
+            .into_iter()
+            .zip(cost.into_iter().map(u16::from))
+            .all(|(r, c)| c <= r)
+    }
+
+    fn try_build(&self, idx: usize, cost: &RobotCost) -> Option<Self> {
+        let t = self.time_to_build(cost)?;
+        if t + 1 > self.time_left { return None;  }
+        let mut next = self.clone();
+        next.advance_time(t + 1);
+        next.build(idx, cost);
+        Some(next)
+    }
+
+    /// Add to the states structure the possible next states.
+    fn branch(&self, blueprint: &Blueprint, states: &mut impl Extend<State>) {
+        // Oh no, we've run out of time!
         if self.time_left == 0 {
             return;
         }
-        states.extend(blueprint.0.iter().enumerate().filter_map(|(idx, cost)| {
-            let can_build = self.resources.iter().zip(cost.0.into_iter()).all(|(r, c)| {
-                let c = usize::from(c);
-                c <= r.amount
-            });
-            if !can_build {
-                return None;
-            }
 
+        // If we can always build geode robots from this point on, then we can shortcurt this state:
+        // That's what's most convenient to do from now on.
+        if self.can_always_build(&blueprint[GEODE]) {
+            dbg!();
             let mut next = self.clone();
-            next.tick(1);
-            next.resources[idx].robots += 1;
-            next.resources.iter_mut().zip(cost.0.into_iter()).for_each(|(r, c)| {
-                r.amount -= usize::from(c);
-            });
+            next.time_left = 0;
+            next.amounts[GEODE] = self.upper_bound();
+            states.extend(once(next));
+            return;
+        }
 
-            Some(next)
-        }));
+        // For each resource: Do we make enough of that resource to build any robot we want? If not,
+        // we'll need more robots!
+        for resource in [ORE, CLAY, OBSIDIAN] {
+            if self.robots[resource] < u16::from(blueprint.max_cost_per_resource[resource]) {
+                states.extend(self.try_build(resource, &blueprint[resource]))
+            }
+        }
 
-        let mut do_nothing = self.clone();
-        do_nothing.tick(1);
-        states.extend(once(do_nothing));
+        // Build a geode robot! They're always useful.
+        states.extend(self.try_build(GEODE, &blueprint[GEODE]));
     }
 }
 
-fn geodes(blueprint: Blueprint, time: usize) -> usize {
-    let mut states = BinaryHeap::new_by_key(|state: &State| state.priority());
+fn maximum_geodes(blueprint: Blueprint, time_alloted: u16) -> u16 {
+    let mut states = Vec::new();
     let mut lower_bound = 0;
 
     let mut initial_state = State::default();
-    initial_state.time_left = time;
-    initial_state.resources[0].robots += 1;
+    initial_state.time_left = time_alloted;
+    initial_state.robots[ORE] += 1;
     states.push(initial_state);
 
     while let Some(state) = states.pop() {
@@ -127,10 +178,9 @@ fn geodes(blueprint: Blueprint, time: usize) -> usize {
         }
 
         let old_len = states.len();
-        state.advance_micro(&blueprint, &mut states);
-        if states.len() == old_len && state.total() > lower_bound {
-            assert_eq!(state.time_left, 0);
-            lower_bound = state.total();
+        state.branch(&blueprint, &mut states);
+        if states.len() == old_len && state.geodes() > lower_bound {
+            lower_bound = state.geodes();
         }
     }
     lower_bound
@@ -138,31 +188,40 @@ fn geodes(blueprint: Blueprint, time: usize) -> usize {
 
 #[inline]
 pub fn solve() -> (impl Display, impl Display) {
-    let blueprints: Vec<_> = (1usize..)
+    let blueprints: Vec<_> = (1..)
         .zip(include_str!("input.txt").lines().map(Blueprint::parse))
         .collect();
 
+    let p1_start = Instant::now();
     let p1 = blueprints
         .clone()
         .into_par_iter()
         .map(|(id, blueprint)| {
             let start = Instant::now();
-            let g = geodes(blueprint, 24);
-            println!("Blueprint {id:2} gets a maximum of {g:3} geodes and takes {:?}", start.elapsed());
+            let g = maximum_geodes(blueprint, 24);
+            eprintln!(
+                "Blueprint {id:2} gets a maximum of {g:2} geodes and takes {:.2?}",
+                start.elapsed()
+            );
             id * g
         })
-        .sum::<usize>();
+        .sum::<u16>();
+    eprintln!("Done with part 1 in {:.2?}", p1_start.elapsed());
 
-    let p2 = blueprints
-        [..3]
+    let p2_start = Instant::now();
+    let p2 = blueprints[..3]
         .into_par_iter()
         .map(|&(id, blueprint)| {
             let start = Instant::now();
-            let g = geodes(blueprint, 32);
-            println!("Blueprint {id:2} gets a maximum of {g:3} geodes and takes {:?}", start.elapsed());
+            let g = maximum_geodes(blueprint, 32);
+            eprintln!(
+                "Blueprint {id:2} gets a maximum of {g:2} geodes and takes {:.2?}",
+                start.elapsed()
+            );
             g
         })
-        .product::<usize>();
+        .product::<u16>();
+    eprintln!("Done with part 2 in {:.2?}", p2_start.elapsed());
 
     (p1, p2)
 }

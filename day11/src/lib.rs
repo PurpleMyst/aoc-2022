@@ -56,31 +56,10 @@ impl Monkey {
             .map(|n| n.parse().unwrap())
             .collect();
         let operation = Operation::parse(lines.next().unwrap().split_once(": ").unwrap().1);
-        let test = lines
-            .next()
-            .unwrap()
-            .rsplit_once(' ')
-            .unwrap()
-            .1
-            .parse()
-            .unwrap();
+        let test = lines.next().unwrap().rsplit_once(' ').unwrap().1.parse().unwrap();
         let targets = (
-            lines
-                .next()
-                .unwrap()
-                .rsplit_once(' ')
-                .unwrap()
-                .1
-                .parse()
-                .unwrap(),
-            lines
-                .next()
-                .unwrap()
-                .rsplit_once(' ')
-                .unwrap()
-                .1
-                .parse()
-                .unwrap(),
+            lines.next().unwrap().rsplit_once(' ').unwrap().1.parse().unwrap(),
+            lines.next().unwrap().rsplit_once(' ').unwrap().1.parse().unwrap(),
         );
         Self {
             items,
@@ -110,9 +89,7 @@ impl Monkey {
 }
 
 fn simulate(mut monkeys: Vec<Monkey>, rounds: usize, divide_by_three: bool) -> usize {
-    let lcm = monkeys
-        .iter()
-        .fold(1, |acc, monkey| num_integer::lcm(acc, monkey.test));
+    let lcm = monkeys.iter().fold(1, |acc, monkey| num_integer::lcm(acc, monkey.test));
 
     let mut buf = vec![Vec::with_capacity(32); monkeys.len()];
 
@@ -142,8 +119,5 @@ pub fn solve() -> (impl Display, impl Display) {
         }
     }
 
-    (
-        simulate(monkeys.clone(), 20, true),
-        simulate(monkeys, 10_000, false),
-    )
+    (simulate(monkeys.clone(), 20, true), simulate(monkeys, 10_000, false))
 }

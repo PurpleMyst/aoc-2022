@@ -8,12 +8,7 @@ pub fn solve() -> (impl Display, impl Display) {
 
     include_str!("input.txt")
         .split("\n\n")
-        .map(|elf| {
-            elf.trim()
-                .split('\n')
-                .map(|n| n.parse::<u64>().unwrap())
-                .sum()
-        })
+        .map(|elf| elf.trim().split('\n').map(|n| n.parse::<u64>().unwrap()).sum())
         .for_each(|elf| {
             if let Some(i) = biggest.iter().position(|&n| elf >= n) {
                 biggest[i..].rotate_right(1);

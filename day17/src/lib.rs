@@ -39,7 +39,7 @@ impl Display for Piece {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Piece's bottom located at y={}", self.bottom_y)?;
         for row in self.rows.iter().rev() {
-            writeln!(f, "{:08b}", row)?;
+            writeln!(f, "{row:08b}")?;
         }
         Ok(())
     }

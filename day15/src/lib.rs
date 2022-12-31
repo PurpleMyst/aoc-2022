@@ -75,7 +75,7 @@ fn do_solve(input: &str, part1_row: i64, search_space: usize) -> (usize, i64) {
     let p1 = (p1_min..=p1_max)
         .into_par_iter()
         .filter(|x| trees[part1_row as usize].contains_point(&(*x as _)))
-        .filter(|x| !beacons.contains(&x))
+        .filter(|x| !beacons.contains(x))
         .count();
 
     let (p2_x, p2_y) = trees

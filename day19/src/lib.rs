@@ -135,7 +135,7 @@ impl State {
         if t + 1 > self.time_left {
             return None;
         }
-        let mut next = self.clone();
+        let mut next = *self;
         next.advance_time(t + 1);
         next.build(idx, cost);
         Some(next)
@@ -152,7 +152,7 @@ impl State {
         // That's what's most convenient to do from now on.
         if self.can_always_build(&blueprint[GEODE]) {
             dbg!();
-            let mut next = self.clone();
+            let mut next = *self;
             next.time_left = 0;
             next.amounts[GEODE] = self.upper_bound();
             states.extend(once(next));
@@ -176,8 +176,7 @@ fn maximum_geodes(blueprint: Blueprint, time_alloted: u16) -> u16 {
     let mut states = Vec::new();
     let mut lower_bound = 0;
 
-    let mut initial_state = State::default();
-    initial_state.time_left = time_alloted;
+    let mut initial_state = State { time_left: time_alloted, ..Default::default() };
     initial_state.robots[ORE] += 1;
     states.push(initial_state);
 

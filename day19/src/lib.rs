@@ -1,6 +1,6 @@
 #![feature(int_roundings)]
 
-use std::{fmt::Display, iter::once, time::Instant};
+use std::{fmt::Display, time::Instant};
 
 use derive_more::{Deref, DerefMut};
 use rayon::prelude::*;
@@ -93,13 +93,14 @@ impl State {
         self.time_left -= t;
     }
 
-    fn time_to_build(&self, costs: &RobotCost) -> Option<u16> {
+    /// How long do we have to wait until we can build this robot? Maybe forever!
+    fn time_to_build(&self, rc: &RobotCost) -> Option<u16> {
         let mut result = 0;
         for ((have, robots), cost) in self
             .amounts
             .into_iter()
             .zip(self.robots.into_iter())
-            .zip(costs.into_iter().map(u16::from))
+            .zip(rc.into_iter().map(u16::from))
         {
             let need = cost.saturating_sub(have);
             if robots == 0 {
@@ -122,15 +123,8 @@ impl State {
         });
     }
 
-    /// Can we always build one geode robot from this point forward?
-    fn can_always_build(&self, cost: &RobotCost) -> bool {
-        self.robots
-            .into_iter()
-            .zip(cost.into_iter().map(u16::from))
-            .all(|(r, c)| c <= r)
-    }
-
-    fn try_build(&self, idx: usize, cost: &RobotCost) -> Option<Self> {
+    /// Wait until we can do so and then build a given robot.
+    fn wait_and_build(&self, idx: usize, cost: &RobotCost) -> Option<Self> {
         let t = self.time_to_build(cost)?;
         if t + 1 > self.time_left {
             return None;
@@ -148,27 +142,16 @@ impl State {
             return;
         }
 
-        // If we can always build geode robots from this point on, then we can shortcurt this state:
-        // That's what's most convenient to do from now on.
-        if self.can_always_build(&blueprint[GEODE]) {
-            dbg!();
-            let mut next = *self;
-            next.time_left = 0;
-            next.amounts[GEODE] = self.upper_bound();
-            states.extend(once(next));
-            return;
-        }
-
-        // For each resource: Do we make enough of that resource to build any robot we want? If not,
-        // we'll need more robots!
+        // For each resource: Do we make enough of that resource to always build any robot we want?
+        // If not, we'll need more robots!
         for resource in [ORE, CLAY, OBSIDIAN] {
             if self.robots[resource] < u16::from(blueprint.max_cost_per_resource[resource]) {
-                states.extend(self.try_build(resource, &blueprint[resource]))
+                states.extend(self.wait_and_build(resource, &blueprint[resource]))
             }
         }
 
         // Build a geode robot! They're always useful.
-        states.extend(self.try_build(GEODE, &blueprint[GEODE]));
+        states.extend(self.wait_and_build(GEODE, &blueprint[GEODE]));
     }
 }
 

@@ -69,11 +69,7 @@ pub fn solve() -> (impl Display, impl Display) {
                 break 'outer;
             }
 
-            let candidates = [
-                (sand.0, sand.1 + 1),
-                (sand.0 - 1, sand.1 + 1),
-                (sand.0 + 1, sand.1 + 1),
-            ];
+            let candidates = [(sand.0, sand.1 + 1), (sand.0 - 1, sand.1 + 1), (sand.0 + 1, sand.1 + 1)];
             if let Some(next) = candidates.into_iter().find(|p| !walls.contains(p)) {
                 sand = next;
             } else {

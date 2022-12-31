@@ -68,14 +68,8 @@ pub fn solve() -> (impl Display, impl Display) {
     packets.push(divider1.clone());
     packets.push(divider2.clone());
     packets.sort_unstable();
-    let idx1 = packets
-        .iter()
-        .position(|packet| packet == &divider1)
-        .unwrap();
-    let idx2 = packets
-        .iter()
-        .position(|packet| packet == &divider2)
-        .unwrap();
+    let idx1 = packets.iter().position(|packet| packet == &divider1).unwrap();
+    let idx2 = packets.iter().position(|packet| packet == &divider2).unwrap();
 
     (p1, (idx1 + 1) * (idx2 + 1))
 }

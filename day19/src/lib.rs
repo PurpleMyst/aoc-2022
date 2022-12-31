@@ -2,8 +2,8 @@
 
 use std::{fmt::Display, iter::once, time::Instant};
 
-use rayon::prelude::*;
 use derive_more::{Deref, DerefMut};
+use rayon::prelude::*;
 
 const ORE: usize = 0;
 const CLAY: usize = 1;
@@ -14,7 +14,12 @@ const GEODE: usize = 3;
 struct RobotCost([u8; 3]);
 
 #[derive(Debug, Clone, Copy, Default, Deref, DerefMut)]
-struct Blueprint { #[deref] #[deref_mut] robot_costs: [RobotCost; 4], max_cost_per_resource: [u8; 3] }
+struct Blueprint {
+    #[deref]
+    #[deref_mut]
+    robot_costs: [RobotCost; 4],
+    max_cost_per_resource: [u8; 3],
+}
 
 impl RobotCost {
     fn parse(s: &str) -> Self {
@@ -52,10 +57,12 @@ impl Blueprint {
             costs.next().unwrap(),
             costs.next().unwrap(),
             costs.next().unwrap(),
-        ] ;
-        let max_per_resource = [ORE, CLAY, OBSIDIAN]
-            .map(|idx| robot_costs.iter().map(|rc| rc[idx]).max().unwrap());
-        Self { robot_costs, max_cost_per_resource: max_per_resource }
+        ];
+        let max_per_resource = [ORE, CLAY, OBSIDIAN].map(|idx| robot_costs.iter().map(|rc| rc[idx]).max().unwrap());
+        Self {
+            robot_costs,
+            max_cost_per_resource: max_per_resource,
+        }
     }
 }
 
@@ -125,7 +132,9 @@ impl State {
 
     fn try_build(&self, idx: usize, cost: &RobotCost) -> Option<Self> {
         let t = self.time_to_build(cost)?;
-        if t + 1 > self.time_left { return None;  }
+        if t + 1 > self.time_left {
+            return None;
+        }
         let mut next = self.clone();
         next.advance_time(t + 1);
         next.build(idx, cost);

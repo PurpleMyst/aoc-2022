@@ -1,9 +1,10 @@
 use std::{
-    collections::HashMap,
     fmt::Display,
     mem::swap,
     ops::{Add, Div, Mul, Sub},
 };
+
+use ahash::HashMap;
 
 /// At-most linear polynomial
 #[derive(Debug, Clone, Copy)]

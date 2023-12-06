@@ -1,4 +1,4 @@
-#![feature(str_split_as_str)]
+#![feature(str_split_remainder)]
 #![warn(clippy::perf)]
 use std::fmt::Display;
 
@@ -52,7 +52,7 @@ pub fn solve() -> (impl Display, impl Display) {
             .parse()
             .unwrap();
         let _ = words.nth(3).unwrap();
-        let passages = words.as_str().split(", ");
+        let passages = words.remainder().unwrap().split(", ");
         flow_rates.insert(valve, flow_rate);
         for destination in passages {
             graph.add_edge(valve, destination, 1);

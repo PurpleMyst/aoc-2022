@@ -47,6 +47,7 @@ dependencies = [
  "day16",
  "day17",
  "day18",
+ "day20",
  "day21",
  "day23",
  "day25",
@@ -383,6 +384,10 @@ dependencies = [
  "derive_more",
  "rayon",
 ]
+
+[[package]]
+name = "day20"
+version = "0.1.0"
 
 [[package]]
 name = "day21"

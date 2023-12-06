@@ -44,4 +44,5 @@ doit!(
     day21,
     day23,
     day25,
+    day20,
 );

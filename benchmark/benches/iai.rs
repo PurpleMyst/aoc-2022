@@ -27,4 +27,5 @@ doit!(
     day21: day21_solve,
     day23: day23_solve,
     day25: day25_solve,
+    day20: day20_solve,
 );

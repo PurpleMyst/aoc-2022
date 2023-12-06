@@ -1,46 +1,23 @@
 use std::fmt::Display;
 
-fn to_base5(n: u64) -> Vec<i8> {
-    let mut n = n;
+fn to_snafu(mut n: u64) -> String {
     let mut result = Vec::new();
 
     while n != 0 {
-        result.push((n % 5) as i8);
-        n /= 5;
+        let place = (n + 2) % 5;
+        n = (n+2)/5;
+        result.push(match place {
+            0 => b'=',
+            1 => b'-',
+            2 => b'0',
+            3 => b'1',
+            4 => b'2',
+            _ => unreachable!(),
+        });
     }
 
     result.reverse();
-
-    result
-}
-
-fn to_snafu(n: u64) -> String {
-    let mut b5 = to_base5(n);
-    for i in (0..b5.len()).rev() {
-        match b5[i] {
-            0 | 1 | 2 => {}
-            n => {
-                if i == 0 {
-                    b5.insert(0, 1);
-                    b5[1] = n - 5;
-                } else {
-                    b5[i - 1] += 1;
-                    b5[i] = n - 5;
-                }
-            }
-        }
-    }
-
-    b5.into_iter()
-        .map(|d| match d {
-            0 => '0',
-            1 => '1',
-            2 => '2',
-            -1 => '-',
-            -2 => '=',
-            _ => unreachable!(),
-        })
-        .collect()
+    String::from_utf8(result).unwrap()
 }
 
 fn parse_snafu(s: &str) -> u64 {

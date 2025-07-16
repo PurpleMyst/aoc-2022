@@ -49,6 +49,7 @@ dependencies = [
  "day18",
  "day20",
  "day21",
+ "day22",
  "day23",
  "day24",
  "day25",
@@ -328,7 +329,7 @@ dependencies = [
 name = "day12"
 version = "0.1.0"
 dependencies = [
- "grid",
+ "grid 0.9.0",
  "petgraph",
 ]
 
@@ -400,6 +401,13 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "polynomial-ring",
+]
+
+[[package]]
+name = "day22"
+version = "0.1.0"
+dependencies = [
+ "grid 0.18.0",
 ]
 
 [[package]]
@@ -500,6 +508,12 @@ checksum = "0634107a3a005070dd73e27e74ecb691a94e9e5ba7829f434db7fbf73a6b5c47"
 dependencies = [
  "no-std-compat",
 ]
+
+[[package]]
+name = "grid"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12101ecc8225ea6d675bc70263074eab6169079621c2186fe0c66590b2df9681"
 
 [[package]]
 name = "half"

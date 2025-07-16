@@ -1,5 +1,6 @@
 target/
 session.txt
 problem.md
-sample_input.txt
+sample_input*.txt
+input.txt
 .env

@@ -1,3 +1,17 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "argh==0.26.2",
+#     "beautifulsoup4==4.12.2",
+#     "browser_cookie3==0.16.2",
+#     "html2text==2020.1.16",
+#     "python-dotenv==1.0.0",
+#     "requests==2.27.1",
+#     "tabulate==0.9.0",
+#     "termcolor==1.1.0",
+#     "tomlkit==0.12.3",
+# ]
+# ///
 import shlex
 import subprocess
 import sys
@@ -5,8 +19,9 @@ import typing as t
 import webbrowser
 from datetime import datetime
 from functools import partial, wraps
-from os import chdir, environ
+from os import chdir, environ, startfile
 from pathlib import Path
+from uuid import uuid4
 
 import browser_cookie3
 import html2text
@@ -43,9 +58,11 @@ WORKSPACE_MANIFEST_PATH = Path(__file__).parent / "Cargo.toml"
 
 NOW = datetime.now()
 
-DAYS_LEFT = set(range(1, 26)) - {int(p.name[len("day"):]) for p in Path(__file__).parent.glob("day*")}
+DAYS_LEFT = set(range(1, 26)) - {
+    int(p.name[len("day") :]) for p in Path(__file__).parent.glob("day*")
+}
 
-YEAR = toml.parse(WORKSPACE_MANIFEST_PATH.read_text()).get("metadata", {}).get("year", NOW.year)
+YEAR = toml.parse(WORKSPACE_MANIFEST_PATH.read_text()).get("workspace", {}).get("metadata", {}).get("year", NOW.year)
 
 load_dotenv()
 
@@ -89,10 +106,24 @@ def in_root_dir(f):
     return inner
 
 
-@arg("-d", "--day", choices=DAYS_LEFT, default=min(DAYS_LEFT), required=False)
+@wrap_errors((requests.HTTPError,))
+def refetch_inputs() -> None:
+    "Fetch the inputs that aren't present locally, since they cannot be stored in the repo."
+    for day in Path(__file__).parent.glob("day*"):
+        input_path = day / "src" / "input.txt"
+        if input_path.exists():
+            continue
+        day_num = int(day.name.removeprefix("day"))
+        resp = session.get(f"https://adventofcode.com/{YEAR}/day/{day_num}/input")
+        resp.raise_for_status()
+        input_path.write_text(resp.text, newline="\n")
+
+
+@arg("-d", "--day", choices=DAYS_LEFT, default=min(DAYS_LEFT, default=0), required=False)
 @aliases("ss")
 @wrap_errors((requests.HTTPError,))
-def start_solve(day: int = min(DAYS_LEFT)) -> None:
+@in_root_dir
+def start_solve(day: int = min(DAYS_LEFT, default=0)) -> None:
     "Start solving a day, by default today."
     crate = f"day{day:02}"
     crate_path = Path(crate)
@@ -182,6 +213,16 @@ def compare(day: str, name: str = DEFAULT_BASELINE) -> None:
 
 
 @in_root_dir
+@aliases("cmp-stash")
+def compare_by_stashing(day: str, name: str = DEFAULT_BASELINE) -> None:
+    "Stash the current changes, set the baseline and then compare the new changes."
+    run(("git", "stash", "push", "-m", "Stashing for benchmarking"))
+    set_baseline(day, name)
+    run(("git", "stash", "pop"))
+    compare(day, name)
+
+
+@in_root_dir
 def criterion(day: str) -> None:
     "Run a criterion benchmark, without caring about baselines."
     run(("cargo", "bench", "--bench", "criterion", "--", day, "--verbose"))
@@ -196,6 +237,7 @@ def iai() -> None:
 @aliases("wr")
 def watch_run() -> None:
     "Run the solution everytime it changes."
+    del environ["RUSTFLAGS"]
     run(("cargo", "watch", "--clear", "--exec", "run"))
 
 
@@ -248,24 +290,19 @@ def answer(answer: str, level: int) -> None:
 
 
 @in_root_dir
-def fetch_problem() -> None:
+def fetch_problem(year, day) -> None:
     "Fetch the problem statement."
     resp = session.get(f"https://adventofcode.com/{year}/day/{day}")
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, features="html.parser").main
     h = html2text.HTML2Text()
     t = h.handle(str(soup)).strip()
-    Path(f"day{day:02}", "problem.md").write_text(t)
+    Path(f"day{day:02}", "problem.md").write_text(t, newline="\n")
 
 
 def show_session_cookie() -> None:
     "Conquer outer space."
     print(c("Your session cookie:", "yellow"), session.cookies["session"])
-
-
-def update_pipreqs() -> None:
-    "Update the requirements.txt file via pipreqs."
-    run(("pipreqs", ".", "--force"))
 
 
 @in_root_dir
@@ -300,17 +337,74 @@ def set_completion_time() -> None:
         print(cb("Not in a day directory.", "red"))
         return
 
-    with WORKSPACE_MANIFEST_PATH.open() as manifest_f:
-        manifest = toml.load(manifest_f)
+    manifest = toml.parse(WORKSPACE_MANIFEST_PATH.read_text())
     metadata = manifest["workspace"].setdefault("metadata", {})  # type: ignore
-    metadata.setdefault(f"day{day:02}", {})["completion_time"] = datetime.now()
+    metadata.setdefault(day, {})["completion_time"] = datetime.now()
 
-    with WORKSPACE_MANIFEST_PATH.open() as manifest_f:
+    with WORKSPACE_MANIFEST_PATH.open("w") as manifest_f:
         toml.dump(manifest, manifest_f)
 
 
+@in_root_dir
+def flamegraph(day: str, *, remote="linode") -> None:
+    "Run a flamegraph benchmark on a remote."
+    import tarfile
+    import tempfile
+
+    from rich.console import Console
+
+    console = Console()
+
+    def filter(info):
+        if any(s in info.name for s in (".git", "target")):
+            console.log(f"{info.name!r} [red]skipped.[/red]")
+            return None
+        console.log(f"{info.name!r} [green]added to tarball.[/green]")
+        return info
+
+    # Generate a zipped tarball of the current source code.
+    archive_stem = str(uuid4())
+    archive_name = f"{archive_stem}.tar.gz"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        archive_path = Path(tmpdir, archive_name)
+        with console.status("Compressing..."), tarfile.open(archive_path, "w:gz") as tar:
+            tar.add(".", filter=filter)
+
+        # Upload it to the remote via scp and untar it.
+        run(("scp", "-C", archive_path, f"{remote}:/tmp/{archive_name}"))
+        run(("ssh", remote, "tar", "-xzf", f"/tmp/{archive_name}", "--one-top-level", "-C", "/tmp"))
+
+    # Run the benchmark on the remote.
+    run(
+        (
+            "ssh",
+            remote,
+            "cd",
+            f"/tmp/{archive_stem}",
+            "&&",
+            "CARGO_PROFILE_BENCH_DEBUG=true",
+            "cargo",
+            "flamegraph",
+            "--bench",
+            "criterion",
+            "--",
+            "--bench",
+            day,
+        )
+    )
+
+    # Download the flamegraph.
+    run(("scp", f"{remote}:/tmp/{archive_stem}/flamegraph.svg", "."))
+
+    # Remove the archive from the remote.
+    run(("ssh", remote, "rm", "-rf", f"/tmp/{archive_stem}", f"/tmp/{archive_name}"))
+
+    # Open the flamegraph.
+    startfile("flamegraph.svg")
+
+
 def main() -> None:
-    environ["RUST_BACKTRACE"] = "1"
+    # environ["RUST_BACKTRACE"] = "1"
     environ["RUSTFLAGS"] = "-C target-cpu=native"
     dispatch_commands(
         (
@@ -318,16 +412,18 @@ def main() -> None:
             answer,
             set_baseline,
             compare,
+            compare_by_stashing,
             criterion,
             iai,
             watch_run,
             do_run,
             run_release,
             run_prototype,
-            update_pipreqs,
             show_session_cookie,
             measure_completion_time,
             set_completion_time,
+            flamegraph,
+            refetch_inputs,
         ),
     )
 

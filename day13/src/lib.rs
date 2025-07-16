@@ -1,4 +1,3 @@
-#![feature(array_chunks)]
 use std::{fmt::Display, str::Chars};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -56,7 +55,8 @@ pub fn solve() -> (impl Display, impl Display) {
         .collect();
 
     let p1: usize = packets
-        .array_chunks()
+        .chunks(2)
+        .map(|pair| <_ as TryInto<&[Item; 2]>>::try_into(pair).unwrap())
         .enumerate()
         .filter(|(_, [l, r])| l < r)
         .map(|(i, _)| i + 1)

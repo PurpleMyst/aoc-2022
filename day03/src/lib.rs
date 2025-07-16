@@ -1,4 +1,3 @@
-#![feature(iter_array_chunks)]
 
 use std::fmt::Display;
 
@@ -22,11 +21,12 @@ fn parse_rucksack(s: &str) -> (u64, u64) {
 
 #[inline]
 pub fn solve() -> (impl Display, impl Display) {
-    let elves = include_str!("input.txt").lines().map(parse_rucksack);
+    let elves = include_str!("input.txt").lines().map(parse_rucksack).collect::<Vec<_>>();
     let mut p1 = 0;
     let mut p2 = 0;
 
-    for group in elves.array_chunks::<3>() {
+    for group in elves.chunks(3) {
+        let group: [_; 3] = group.try_into().unwrap();
         for (l, r) in group {
             p1 += (l & r).trailing_zeros() + 1;
         }

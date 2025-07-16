@@ -1,4 +1,3 @@
-#![feature(str_split_remainder)]
 #![warn(clippy::perf)]
 use std::fmt::Display;
 
@@ -39,6 +38,7 @@ pub fn solve() -> (impl Display, impl Display) {
     let mut graph = UnGraphMap::new();
     let mut flow_rates: HashMap<&str, u16> = HashMap::default();
     for line in include_str!("input.txt").lines() {
+        let line = line.replace(',', "").to_string().leak();
         let mut words = line.split(' ');
         let valve = words.nth(1).unwrap();
         let flow_rate: u16 = words
@@ -52,7 +52,7 @@ pub fn solve() -> (impl Display, impl Display) {
             .parse()
             .unwrap();
         let _ = words.nth(3).unwrap();
-        let passages = words.remainder().unwrap().split(", ");
+        let passages = words;
         flow_rates.insert(valve, flow_rate);
         for destination in passages {
             graph.add_edge(valve, destination, 1);

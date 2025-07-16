@@ -1,5 +1,3 @@
-#![feature(int_roundings)]
-
 use std::{fmt::Display, time::Instant};
 
 use derive_more::{Deref, DerefMut};
